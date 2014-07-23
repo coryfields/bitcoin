@@ -1,0 +1,24 @@
+language: cpp
+sudo: false
+cache:
+  directories:
+  - depends/built
+  - $HOME/.ccache
+before_script:
+    - unset CC; unset CXX
+    - make $MAKEOPTS -C depends HOST=$HOST
+    - make -C depends HOST=$HOST install
+script:
+    - export CCACHE_TEMPDIR=/tmp/.ccache-temp CCACHE_COMPRESS=1
+    - ./autogen.sh
+    - ./configure --prefix=`pwd`/depends/$HOST $GLOBALOPTS $OPTS
+    - make $MAKEOPTS
+after_script:
+    - make check
+os: linux
+env:
+  global:
+    - MAKEOPTS=-j2
+    - GLOBALOPTS=--disable-dependency-tracking CXXFLAGS="-O2 -pipe"
+  matrix:
+    - HOST=x86_64-unknown-linux-gnu
