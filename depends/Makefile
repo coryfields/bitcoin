@@ -57,7 +57,7 @@ include builders/default.mk
 
 packages:=qrencode bdb libjpeg zlib libpng protobuf miniupnpc pcre boost openssl qt
 
-native_packages := native_protobuf
+native_packages := native_protobuf native_ccache
 
 include funcs.mk
 

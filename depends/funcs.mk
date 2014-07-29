@@ -191,5 +191,5 @@ $(foreach package,$(packages) $(native_packages),$(eval $(call int_config_attach
 #create build targets
 $(foreach package,$(packages) $(native_packages),$(eval $(call int_add_cmds,$(package))))
 
+$(foreach package,$(packages) $(native_packages),$(eval cached: | $($(package)_cached)))
 $(foreach package,$(packages),$(eval $($(package)_fetched): |$($($(host_arch)_$(host_os)_native_toolchain)_cached) ))
-$(foreach package,$(packages),$(eval cached: | $($(package)_cached)))

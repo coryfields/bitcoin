@@ -30,7 +30,7 @@ export CC="@CC@"
 export CXX="@CXX@"
 export OBJC="${CC}"
 export OBJCXX="${CXX}"
-
+export CCACHE="$prefix/native/bin/ccache"
 
 if test -n "@CFLAGS@"; then
   export CFLAGS="@CFLAGS@"
