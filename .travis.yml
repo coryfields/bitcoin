@@ -1,0 +1,59 @@
+# errata:
+# - OSX requires a non-redistributable SDK. A secure string is used to mask
+#   the url from which it is fetched.
+# - A travis bug causes caches to trample eachother when using the same
+#   compiler key (which we don't use anyway). This is worked around for now by
+#   using the phony compilers "true X". These can be removed when the travis
+#   bug is fixed. See: https://github.com/travis-ci/casher/issues/6
+
+os: linux
+language: cpp
+env:
+  global:
+    - secure: "MtzCf52H5v569kdavjE9dgb23KMsJiuhKsdUml0DpOO3cdO6AimWLuPiHWtKn9fIFtyJmdZaeIheYvOYLpvl3ub+FC7zlBfQs6gSkvcsxYlhTOGvGP85MhTKFG+14UDlKvNNK4P0pauDjI3yVimfJn1h9xF4OKVh1qoLcxw7Vww="
+    - MAKEJOBS=-j3
+    - RUN_TESTS=false
+    - BITCOIN_CONFIG_ALL=--disable-dependency-tracking
+    - CCACHE_SIZE=100M
+    - CCACHE_TEMPDIR=/tmp/.ccache-temp
+    - CCACHE_COMPRESS=1
+cache:
+  apt: true
+  directories:
+  - depends/built
+  - $HOME/.ccache
+matrix:
+  fast_finish: true
+  include:
+    - compiler: "true 1"
+      env: HOST=arm-linux-gnueabihf PACKAGES="g++-arm-linux-gnueabihf" DEP_OPTS="NO_QT=1" GOAL="install" BITCOIN_CONFIG"--enable-glibc-back-compat"
+    - compiler: "true 2"
+      env: HOST=x86_64-unknown-linux-gnu DEP_OPTS="NO_QT=1 NO_WALLET=1 NO_UPNP=1" RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-glibc-back-compat"
+    - compiler: "true 3"
+      env: HOST=x86_64-unknown-linux-gnu RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-glibc-back-compat"
+    - compiler: "true 4"
+      env: HOST=i686-pc-linux-gnu PACKAGES="g++-multilib" RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-glibc-back-compat"
+    - compiler: "true 5"
+      env: HOST=x86_64-apple-darwin11 PACKAGES="g++-multilib cmake libcap-dev libz-dev libbz2-dev" GOAL="deploy"
+    - compiler: "true 6"
+      env: HOST=x86_64-w64-mingw32 PACKAGES="nsis gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 mingw-w64-dev" GOAL="deploy"
+    - compiler: "true 7"
+      env: HOST=i686-w64-mingw32 PACKAGES="nsis gcc-mingw-w64-i686 g++-mingw-w64-i686 binutils-mingw-w64-i686 mingw-w64-dev" GOAL="deploy"
+install:
+    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get update; fi
+    - if [ -n "$PACKAGES" ]; then travis_retry sudo apt-get install --no-upgrade -qq $PACKAGES; fi
+before_script:
+    - unset CC; unset CXX
+    - mkdir -p depends/SDKs
+    - if [ "$HOST" = "x86_64-apple-darwin11" ]; then travis_retry wget -q -O sdk.tar.gz $OSX_SDK_URL && tar -C depends/SDKs -xf sdk.tar.gz; fi
+    - make $MAKEJOBS -C depends HOST=$HOST $DEP_OPTS || (echo "Build failure. Verbose build follows." && make -C depends V=1 HOST=$HOST $DEP_OPTS)
+script:
+    - depends/$HOST/native/bin/ccache --max-size=$CCACHE_SIZE
+    - if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then export CCACHE_READONLY=1; fi
+    - ./autogen.sh
+    - ./configure --cache-file=config.cache --prefix=`pwd`/depends/$HOST $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
+    - make distdir PACKAGE=bitcoin VERSION=$HOST
+    - cd bitcoin-$HOST
+    - ./configure --cache-file=../config.cache --prefix=`pwd`/../depends/$HOST $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
+    - make $MAKEJOBS $GOAL || ( echo "Build failure. Verbose build follows." && make $GOAL V=1 ; false )
+    - if [ "$RUN_TESTS" = "true" ]; then make check; fi
