@@ -13,10 +13,10 @@ env:
     - secure: "MtzCf52H5v569kdavjE9dgb23KMsJiuhKsdUml0DpOO3cdO6AimWLuPiHWtKn9fIFtyJmdZaeIheYvOYLpvl3ub+FC7zlBfQs6gSkvcsxYlhTOGvGP85MhTKFG+14UDlKvNNK4P0pauDjI3yVimfJn1h9xF4OKVh1qoLcxw7Vww="
     - MAKEJOBS=-j3
     - RUN_TESTS=false
-    - BITCOIN_CONFIG_ALL=--disable-dependency-tracking
     - CCACHE_SIZE=100M
     - CCACHE_TEMPDIR=/tmp/.ccache-temp
     - CCACHE_COMPRESS=1
+    - BASE_OUTDIR=$TRAVIS_BUILD_DIR/out
 cache:
   apt: true
   directories:
@@ -48,12 +48,16 @@ before_script:
     - if [ "$HOST" = "x86_64-apple-darwin11" ]; then travis_retry wget -q -O sdk.tar.gz $OSX_SDK_URL && tar -C depends/SDKs -xf sdk.tar.gz; fi
     - make $MAKEJOBS -C depends HOST=$HOST $DEP_OPTS || (echo "Build failure. Verbose build follows." && make -C depends V=1 HOST=$HOST $DEP_OPTS)
 script:
+    - OUTDIR=$BASE_OUTDIR/$TRAVIS_PULL_REQUEST/$TRAVIS_JOB_NUMBER-$HOST
+    - BITCOIN_CONFIG_ALL="--disable-dependency-tracking --prefix=$TRAVIS_BUILD_DIR/depends/$HOST --bindir=$OUTDIR/bin --libdir=$OUTDIR/lib"
     - depends/$HOST/native/bin/ccache --max-size=$CCACHE_SIZE
     - if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then export CCACHE_READONLY=1; fi
     - ./autogen.sh
-    - ./configure --cache-file=config.cache --prefix=`pwd`/depends/$HOST $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
+    - ./configure --cache-file=config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
     - make distdir PACKAGE=bitcoin VERSION=$HOST
     - cd bitcoin-$HOST
-    - ./configure --cache-file=../config.cache --prefix=`pwd`/../depends/$HOST $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
+    - ./configure --cache-file=../config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
     - make $MAKEJOBS $GOAL || ( echo "Build failure. Verbose build follows." && make $GOAL V=1 ; false )
     - if [ "$RUN_TESTS" = "true" ]; then make check; fi
+after_script:
+    - if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then (echo "Upload goes here. Something like: scp -r $BASE_OUTDIR server" || echo "upload failed"); fi
